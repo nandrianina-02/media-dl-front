@@ -8,9 +8,16 @@ interface Props {
   thumbnail?: string;
   site?: string;
   siteColor?: string;
+  duration?: number;
 }
 
-export default function MediaCard({ title, author, thumbnail, site, siteColor }: Props) {
+function formatDuration(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+export default function MediaCard({ title, author, thumbnail, site, siteColor, duration }: Props) {
   return (
     <div className="bg-surface border border-red/30 rounded-2xl p-4 flex gap-4 items-center animate-fade-in">
       {/* Thumbnail */}
@@ -39,6 +46,12 @@ export default function MediaCard({ title, author, thumbnail, site, siteColor }:
             style={{ background: siteColor || "#555" }}
           >
             {site}
+          </span>
+        )}
+
+        {duration && (
+          <span className="font-mono text-[10px] text-muted2 mt-1 block">
+            ⏱ {formatDuration(duration)}
           </span>
         )}
       </div>

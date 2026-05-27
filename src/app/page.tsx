@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { ping, startDownload, pollStatus, fileUrl, fetchYouTubeMeta, type Job } from "@/lib/api";
+import { ping, startDownload, pollStatus, fileUrl, fetchYouTubeMeta, type Job, fetchMediaInfo } from "@/lib/api";
 import { detectSite, extractYouTubeId, SUPPORTED_SITES } from "@/lib/sites";
 import Header from "@/components/Header";
 import ServerBanner from "@/components/ServerBanner";
@@ -29,6 +29,8 @@ export interface MediaInfo {
   thumbnail?: string;
   site?: string;
   siteColor?: string;
+  loading?: boolean;
+  duration?: number;
 }
 
 export default function Home() {
@@ -92,28 +94,33 @@ export default function Home() {
   // Detect media from URL
   const loadMedia = useCallback(async (inputUrl: string) => {
     const site = detectSite(inputUrl);
-    if (!site) {
-      setMedia(null);
-      return;
-    }
+    if (!site) { setMedia(null); return; }
 
-    setMedia({ title: "Détection…", author: inputUrl.slice(0, 60), site: site.name, siteColor: site.color });
+    // Affiche un état de chargement immédiatement
+    setMedia({
+      title: "Chargement…",
+      author: inputUrl.slice(0, 50),
+      site: site.name,
+      siteColor: site.color,
+      loading: true,
+    });
 
-    const ytId = extractYouTubeId(inputUrl);
-    if (ytId) {
-      const meta = await fetchYouTubeMeta(ytId);
+    // Appel backend pour tous les sites
+    const info = await fetchMediaInfo(inputUrl);
+    if (info) {
       setMedia({
-        title: meta?.title || "Vidéo YouTube",
-        author: meta?.author_name || "YouTube",
-        thumbnail: `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`,
-        site: "YouTube",
-        siteColor: "#ff3c00",
+        title:     info.title,
+        author:    info.author,
+        thumbnail: info.thumbnail,
+        duration:  info.duration,
+        site:      info.site || site.name,
+        siteColor: site.color,
       });
     } else {
       setMedia({
-        title: `Lien ${site.name} détecté`,
-        author: inputUrl.slice(0, 60),
-        site: site.name,
+        title:     `Lien ${site.name} détecté`,
+        author:    inputUrl.slice(0, 50),
+        site:      site.name,
         siteColor: site.color,
       });
     }
@@ -224,6 +231,7 @@ export default function Home() {
               thumbnail={media.thumbnail}
               site={media.site}
               siteColor={media.siteColor}
+              duration={media.duration}
             />
           )}
 

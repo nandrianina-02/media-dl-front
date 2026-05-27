@@ -80,3 +80,24 @@ export async function fetchYouTubeMeta(videoId: string): Promise<YouTubeMeta | n
     return null;
   }
 }
+
+export interface MediaInfo {
+  title: string;
+  author: string;
+  thumbnail: string;
+  duration?: number;
+  site: string;
+}
+
+export async function fetchMediaInfo(url: string): Promise<MediaInfo | null> {
+  try {
+    const r = await fetch(
+      `${BASE}/info?url=${encodeURIComponent(url)}`,
+      { headers: headers(), signal: AbortSignal.timeout(16000) }
+    );
+    if (!r.ok) return null;
+    return r.json();
+  } catch {
+    return null;
+  }
+}
