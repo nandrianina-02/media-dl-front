@@ -191,8 +191,16 @@ export default function Home() {
 
   const handleDownloadFile = useCallback(() => {
     if (!currentJobId) return;
-    window.open(fileUrl(currentJobId), "_blank");
-  }, [currentJobId]);
+    const url = fileUrl(currentJobId);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = job?.filename || "media";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, [currentJobId, job]);
 
   const handleReset = useCallback(() => {
     setJob(null);
