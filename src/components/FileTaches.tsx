@@ -91,6 +91,8 @@ function LigneTache({ tache: t }: { tache: Tache }) {
           </p>
           {detail && <p className="text-[12px] text-muted2 mt-1.5 tabular-nums">{detail}</p>}
           {t.statut === "erreur" && t.erreur && <p className="text-[12px] text-accent-texte mt-1.5 leading-relaxed">{t.erreur}</p>}
+          {/* Liste livrée en partie : le fichier est prêt, mais incomplet. */}
+          {t.statut === "pret" && t.erreur && <p className="text-[12px] text-muted mt-1 leading-relaxed">{t.erreur}</p>}
           {erreurRelance && <p className="animate-fade text-[12px] text-accent-texte mt-1.5 leading-relaxed">{erreurRelance}</p>}
         </div>
         <div className="flex items-start gap-1 -mr-1">

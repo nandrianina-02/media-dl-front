@@ -35,6 +35,7 @@ interface Props {
   avance: Avance;
   onAvance: (a: Avance) => void;
   erreurExtrait: string | null;
+  audioSeul?: boolean;
 }
 
 export default function Options({
@@ -48,6 +49,7 @@ export default function Options({
   avance,
   onAvance,
   erreurExtrait,
+  audioSeul = false,
 }: Props) {
   const [ouvert, setOuvert] = useState(false);
   const video = estVideo(format);
@@ -79,11 +81,12 @@ export default function Options({
           </Etiquette>
           <div className="flex flex-wrap gap-1.5">
             {FORMATS_VIDEO.map((f) => (
-              <Puce key={f} actif={format === f} onClick={() => onFormat(f)}>
+              <Puce key={f} actif={format === f} disabled={audioSeul} onClick={() => onFormat(f)}>
                 {f.toUpperCase()}
               </Puce>
             ))}
           </div>
+          {audioSeul && <p className="mt-2 text-[12px] text-muted">Pas de vidéo pour cette source.</p>}
         </div>
       </div>
 

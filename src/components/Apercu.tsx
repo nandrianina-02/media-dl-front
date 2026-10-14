@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import clsx from "clsx";
-import { Clock, Captions, Film, ListMusic, MonitorPlay, Radio, User } from "lucide-react";
+import { Clock, Captions, Film, Info, ListMusic, MonitorPlay, Radio, User } from "lucide-react";
 import type { Infos, InfosListe } from "@/lib/api";
 import { duree } from "@/lib/format";
 import { Case } from "./ui";
@@ -9,11 +10,18 @@ import { Case } from "./ui";
 /* Les miniatures viennent de n'importe quel site pris en charge : next/image
    demanderait de déclarer chaque domaine, pour une image affichée une fois. */
 function Miniature({ src, liste }: { src: string | null; liste?: boolean }) {
+  const [echec, setEchec] = useState<string | null>(null);
   return (
     <div className="relative w-full sm:w-44 aspect-video shrink-0 rounded overflow-hidden bg-s3">
-      {src ? (
+      {src && echec !== src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover animate-fade" />
+        <img
+          src={src}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setEchec(src)}
+          className="w-full h-full object-cover animate-fade"
+        />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-muted">
           {liste ? <ListMusic size={22} /> : <Film size={22} />}
@@ -86,9 +94,16 @@ export default function Apercu({ infos, selection, onSelection }: Props) {
               </span>
             )}
           </div>
-          {infos.type === "media" && (infos.avertissement || infos.direct) && (
+          {((infos.type === "media" && infos.direct) || infos.avertissement) && (
             <p className="mt-3 text-[12px] text-accent-texte">
-              {infos.direct ? "Les directs ne peuvent pas être téléchargés." : infos.avertissement}
+              {infos.type === "media" && infos.direct ? "Les directs ne peuvent pas être téléchargés." : infos.avertissement}
+            </p>
+          )}
+          {infos.site === "Spotify" && (
+            <p className="mt-3 text-[12px] text-muted leading-relaxed flex gap-1.5">
+              <Info size={13} className="shrink-0 mt-px" />
+              Spotify ne permet pas de récupérer son audio : le morceau est retrouvé sur YouTube, puis étiqueté avec le
+              titre, l&apos;album et la pochette de Spotify.
             </p>
           )}
         </div>

@@ -11,6 +11,7 @@ const SECTIONS = [
     texte: [
       "MediaDL est un outil technique. Vous êtes seul responsable de ce que vous téléchargez et de l'usage que vous en faites.",
       "Ne téléchargez que des contenus dont vous détenez les droits, qui sont sous licence libre, ou que la loi de votre pays vous autorise à copier pour un usage privé. La plupart des plateformes interdisent le téléchargement dans leurs conditions d'utilisation.",
+      "Pour un lien Spotify, aucun audio n'est lu sur Spotify : seules les informations publiques du morceau (titre, artistes, album, pochette) servent à retrouver un enregistrement équivalent sur YouTube. Le résultat peut différer de la version Spotify.",
       "Les ayants droit qui constatent un usage abusif peuvent écrire à l'exploitant du service : les fichiers ne sont pas conservés, mais l'accès peut être restreint.",
     ],
   },

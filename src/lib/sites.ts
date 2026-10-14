@@ -17,6 +17,7 @@ export const SITES: Site[] = [
   { nom: "Twitch", domaines: ["twitch.tv"] },
   { nom: "X", domaines: ["twitter.com", "x.com"] },
   { nom: "Reddit", domaines: ["reddit.com", "redd.it"] },
+  { nom: "Spotify", domaines: ["open.spotify.com"] },
 ];
 
 export function detecterSite(saisie: string): Site | null {

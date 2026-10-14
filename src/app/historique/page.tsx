@@ -211,7 +211,9 @@ function Ligne({ tache: t, rang, relancee, onRelancer }: { tache: Tache; rang: n
           <span>{ilYA(t.cree_le)}</span>
           <span className={statut.classe}>{statut.libelle}</span>
         </p>
-        {t.statut === "erreur" && t.erreur && <p className="mt-1.5 text-[12px] text-muted2">{t.erreur}</p>}
+        {(t.statut === "erreur" || t.statut === "pret") && t.erreur && (
+          <p className="mt-1.5 text-[12px] text-muted2">{t.erreur}</p>
+        )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
         {t.disponible && (

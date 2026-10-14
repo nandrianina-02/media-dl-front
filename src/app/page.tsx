@@ -77,6 +77,13 @@ export default function Accueil() {
     };
   }, [saisie, modeListe]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Source sans vidéo (Spotify) : on repasse sur le format audio par défaut.
+  useEffect(() => {
+    if (!infos?.audio_seul || !estVideo(format)) return;
+    setFormat(estVideo(reglages.format) ? "mp3" : reglages.format);
+    setQualite(reglages.qualiteAudio);
+  }, [infos]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function changerSaisie(valeur: string) {
     setSaisie(valeur);
     setModeListe(false);
@@ -185,6 +192,7 @@ export default function Accueil() {
             hauteurs={infos?.type === "media" ? infos.hauteurs : []}
             languesDispo={infos?.type === "media" ? infos.sous_titres : []}
             liste={liste}
+            audioSeul={!!infos?.audio_seul}
             avance={avance}
             onAvance={setAvance}
             erreurExtrait={extrait.erreur}

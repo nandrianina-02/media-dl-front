@@ -75,6 +75,8 @@ export interface InfosMedia {
   url: string;
   choix_liste: boolean;
   avertissement?: string;
+  /** Source sans vidéo (Spotify) : seuls les formats audio sont proposés. */
+  audio_seul?: boolean;
 }
 
 export interface EntreeListe {
@@ -94,6 +96,8 @@ export interface InfosListe {
   site: string;
   url: string;
   choix_liste: boolean;
+  avertissement?: string;
+  audio_seul?: boolean;
 }
 
 export type Infos = InfosMedia | InfosListe;
