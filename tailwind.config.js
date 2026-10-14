@@ -1,20 +1,25 @@
 /** @type {import('tailwindcss').Config} */
+
+// Les couleurs passent par des variables CSS (globals.css) : le thème clair
+// les redéfinit sans toucher aux composants.
+const jeton = (nom) => `rgb(var(--${nom}) / <alpha-value>)`;
+
 module.exports = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
       colors: {
-        bg:      "#080808",
-        surface: "#111111",
-        s2:      "#1a1a1a",
-        s3:      "#222222",
-        border:  "#282828",
-        red:     "#ff3c00",
-        orange:  "#ff7a45",
-        green:   "#00e87a",
-        text:    "#efefef",
-        muted:   "#555555",
-        muted2:  "#888888",
+        bg: jeton("bg"),
+        surface: jeton("surface"),
+        s2: jeton("s2"),
+        s3: jeton("s3"),
+        border: jeton("border"),
+        accent: jeton("accent"),
+        "accent-texte": jeton("accent-texte"),
+        green: jeton("green"),
+        text: jeton("text"),
+        muted: jeton("muted"),
+        muted2: jeton("muted2"),
       },
       fontFamily: {
         mono: ["var(--font-mono)", "Consolas", "monospace"],

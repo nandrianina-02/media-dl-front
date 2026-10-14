@@ -1,15 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "i.ytimg.com" },
-    ],
-  },
-  async rewrites() {
+  // Image Docker autonome : seul le nécessaire est copié (voir Dockerfile).
+  output: "standalone",
+  poweredByHeader: false,
+  async headers() {
     return [
       {
-        source: "/api/backend/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/:path*`,
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
       },
     ];
   },

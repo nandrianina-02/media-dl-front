@@ -1,27 +1,31 @@
-export interface SiteInfo {
-  name: string;
-  color: string;
-  pattern: RegExp;
+// Détection côté navigateur, pour réagir dès la saisie. Le serveur refait la
+// vérification (domaine exact) : ceci n'est qu'un confort d'affichage.
+
+export interface Site {
+  nom: string;
+  domaines: string[];
 }
 
-export const SUPPORTED_SITES: SiteInfo[] = [
-  { name: "YouTube",     color: "#ff3c00", pattern: /youtube\.com|youtu\.be/ },
-  { name: "TikTok",      color: "#69C9D0", pattern: /tiktok\.com/ },
-  { name: "Instagram",   color: "#e1306c", pattern: /instagram\.com/ },
-  { name: "SoundCloud",  color: "#ff5500", pattern: /soundcloud\.com/ },
-  { name: "Facebook",    color: "#1877f2", pattern: /facebook\.com|fb\.watch/ },
-  { name: "Vimeo",       color: "#1ab7ea", pattern: /vimeo\.com/ },
-  { name: "Dailymotion", color: "#0066DC", pattern: /dailymotion\.com/ },
-  { name: "Twitch",      color: "#9147ff", pattern: /twitch\.tv/ },
-  { name: "Twitter/X",   color: "#1da1f2", pattern: /twitter\.com|x\.com/ },
-  { name: "Reddit",      color: "#ff4500", pattern: /reddit\.com/ },
+export const SITES: Site[] = [
+  { nom: "YouTube", domaines: ["youtube.com", "youtu.be"] },
+  { nom: "TikTok", domaines: ["tiktok.com"] },
+  { nom: "Instagram", domaines: ["instagram.com"] },
+  { nom: "SoundCloud", domaines: ["soundcloud.com"] },
+  { nom: "Facebook", domaines: ["facebook.com", "fb.watch"] },
+  { nom: "Vimeo", domaines: ["vimeo.com"] },
+  { nom: "Dailymotion", domaines: ["dailymotion.com", "dai.ly"] },
+  { nom: "Twitch", domaines: ["twitch.tv"] },
+  { nom: "X", domaines: ["twitter.com", "x.com"] },
+  { nom: "Reddit", domaines: ["reddit.com", "redd.it"] },
 ];
 
-export function detectSite(url: string): SiteInfo | null {
-  return SUPPORTED_SITES.find((s) => s.pattern.test(url)) ?? null;
-}
-
-export function extractYouTubeId(url: string): string | null {
-  const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  return m ? m[1] : null;
+export function detecterSite(saisie: string): Site | null {
+  const texte = saisie.trim();
+  if (!texte) return null;
+  try {
+    const hote = new URL(/^https?:\/\//i.test(texte) ? texte : `https://${texte}`).hostname.toLowerCase();
+    return SITES.find((s) => s.domaines.some((d) => hote === d || hote.endsWith(`.${d}`))) ?? null;
+  } catch {
+    return null;
+  }
 }

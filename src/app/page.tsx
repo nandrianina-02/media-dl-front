@@ -1,294 +1,248 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { ping, startDownload, pollStatus, fileUrl, fetchYouTubeMeta, type Job, fetchMediaInfo } from "@/lib/api";
-import { detectSite, extractYouTubeId, SUPPORTED_SITES } from "@/lib/sites";
-import Header from "@/components/Header";
-import ServerBanner from "@/components/ServerBanner";
-import MediaCard from "@/components/MediaCard";
-import DownloadForm from "@/components/DownloadForm";
-import ProgressCard from "@/components/ProgressCard";
-import SuccessCard from "@/components/SuccessCard";
-import HistoryList from "@/components/HistoryList";
-import SiteChips from "@/components/SiteChips";
-import Toast from "@/components/Toast";
-import Footer from "@/components/Footer";
+import { useEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
+import { ArrowDownToLine, ListMusic, LoaderCircle, MonitorPlay, WifiOff } from "lucide-react";
+import Apercu, { ApercuChargement } from "@/components/Apercu";
+import ChampLien from "@/components/ChampLien";
+import FileTaches from "@/components/FileTaches";
+import Options, { estVideo, type Avance } from "@/components/Options";
+import { Alerte, Etiquette } from "@/components/ui";
+import { ErreurApi, infos as lireInfos, type Format, type Infos } from "@/lib/api";
+import { useFile } from "@/lib/file";
+import { lireDuree } from "@/lib/format";
+import { useReglages } from "@/lib/reglages";
+import { detecterSite, SITES } from "@/lib/sites";
 
-export interface HistoryItem {
-  title: string;
-  url: string;
-  site: string;
-  format: string;
-  quality: string;
-  ts: number;
-}
+const AVANCE_VIDE: Avance = { debut: "", fin: "", sousTitres: [], pochette: true };
 
-export interface MediaInfo {
-  title: string;
-  author: string;
-  thumbnail?: string;
-  site?: string;
-  siteColor?: string;
-  loading?: boolean;
-  duration?: number;
-}
+export default function Accueil() {
+  const { ajouter, enLigne } = useFile();
+  const { reglages, charge } = useReglages();
 
-export default function Home() {
-  // Server
-  const [online, setOnline] = useState<boolean | null>(null);
+  const [saisie, setSaisie] = useState("");
+  const [modeListe, setModeListe] = useState(false);
+  const [infos, setInfos] = useState<Infos | null>(null);
+  const [chargement, setChargement] = useState(false);
+  const [erreurInfos, setErreurInfos] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Set<number>>(new Set());
 
-  // URL / media
-  const [url, setUrl] = useState("");
-  const [media, setMedia] = useState<MediaInfo | null>(null);
+  const [format, setFormat] = useState<Format>("mp3");
+  const [qualite, setQualite] = useState("192");
+  const [avance, setAvance] = useState<Avance>(AVANCE_VIDE);
 
-  // Download options
-  const [format, setFormat] = useState("mp3");
-  const [quality, setQuality] = useState("128");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreurEnvoi, setErreurEnvoi] = useState<string | null>(null);
+  const champRef = useRef<HTMLDivElement>(null);
 
-  // Job
-  const [job, setJob] = useState<Job | null>(null);
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
-
-  // History
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-
-  // Toast
-  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
-  const toastTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const showToast = useCallback((msg: string, type: "ok" | "err" = "ok") => {
-    setToast({ msg, type });
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3000);
-  }, []);
-
-  // Ping server
-  const checkServer = useCallback(async () => {
-    const ok = await ping();
-    setOnline(ok);
-  }, []);
-
+  // Les réglages ne sont lisibles qu'une fois dans le navigateur.
   useEffect(() => {
-    checkServer();
-    const iv = setInterval(checkServer, 8000);
-    return () => clearInterval(iv);
-  }, [checkServer]);
+    if (!charge) return;
+    setFormat(reglages.format);
+    setQualite(estVideo(reglages.format) ? reglages.qualiteVideo : reglages.qualiteAudio);
+    setAvance((a) => ({ ...a, pochette: reglages.pochette }));
+  }, [charge]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load history from localStorage
+  const site = detecterSite(saisie);
+
+  // Aperçu : attendu une demi-seconde après la dernière frappe, la requête
+  // précédente annulée, pour ne pas interroger le site à chaque caractère.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("mediadl_history");
-      if (raw) setHistory(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  const saveHistory = useCallback((item: HistoryItem) => {
-    setHistory((prev) => {
-      const next = [item, ...prev].slice(0, 12);
-      localStorage.setItem("mediadl_history", JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  // Detect media from URL
-  const loadMedia = useCallback(async (inputUrl: string) => {
-    const site = detectSite(inputUrl);
-    if (!site) { setMedia(null); return; }
-
-    // Affiche un état de chargement immédiatement
-    setMedia({
-      title: "Chargement…",
-      author: inputUrl.slice(0, 50),
-      site: site.name,
-      siteColor: site.color,
-      loading: true,
-    });
-
-    // Appel backend pour tous les sites
-    const info = await fetchMediaInfo(inputUrl);
-    if (info) {
-      setMedia({
-        title:     info.title,
-        author:    info.author,
-        thumbnail: info.thumbnail,
-        duration:  info.duration,
-        site:      info.site || site.name,
-        siteColor: site.color,
-      });
-    } else {
-      setMedia({
-        title:     `Lien ${site.name} détecté`,
-        author:    inputUrl.slice(0, 50),
-        site:      site.name,
-        siteColor: site.color,
-      });
-    }
-  }, []);
-
-  const handleUrlChange = useCallback(
-    (val: string) => {
-      setUrl(val);
-      if (val.length > 12) loadMedia(val);
-      else setMedia(null);
-    },
-    [loadMedia]
-  );
-
-  // Download
-  const handleDownload = useCallback(async () => {
-    if (!url.trim() || !detectSite(url)) {
-      showToast("⚠ Lien non supporté", "err");
+    setErreurInfos(null);
+    setErreurEnvoi(null);
+    if (!site) {
+      setInfos(null);
+      setChargement(false);
       return;
     }
-    if (!online) {
-      showToast("⚠ Serveur non joignable", "err");
-      return;
-    }
+    const controle = new AbortController();
+    setChargement(true);
+    const minuterie = setTimeout(async () => {
+      try {
+        const resultat = await lireInfos(saisie.trim(), modeListe, controle.signal);
+        setInfos(resultat);
+        setSelection(new Set(resultat.type === "liste" ? resultat.entrees.map((e) => e.index) : []));
+        setAvance((a) => ({ ...a, sousTitres: [] }));
+      } catch (e) {
+        if (controle.signal.aborted) return;
+        setInfos(null);
+        setErreurInfos(e instanceof ErreurApi ? e.message : "L'aperçu n'a pas pu être chargé.");
+      } finally {
+        if (!controle.signal.aborted) setChargement(false);
+      }
+    }, 500);
+    return () => {
+      clearTimeout(minuterie);
+      controle.abort();
+    };
+  }, [saisie, modeListe]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Reset job state
-    setJob({ id: "", url, format, quality, site: "", status: "queued", progress: 0 });
-    setCurrentJobId(null);
-    if (pollingRef.current) clearInterval(pollingRef.current);
+  function changerSaisie(valeur: string) {
+    setSaisie(valeur);
+    setModeListe(false);
+  }
 
+  function changerFormat(f: Format) {
+    if (estVideo(f) !== estVideo(format)) setQualite(estVideo(f) ? reglages.qualiteVideo : reglages.qualiteAudio);
+    setFormat(f);
+  }
+
+  const liste = infos?.type === "liste";
+  const extrait = useMemo(() => {
+    if (liste) return { debut: null, fin: null, erreur: null };
+    const debut = lireDuree(avance.debut);
+    const fin = lireDuree(avance.fin);
+    const duree = infos?.type === "media" ? infos.duree : null;
+    let erreur: string | null = null;
+    if (Number.isNaN(debut) || Number.isNaN(fin)) erreur = "Format attendu : 1:30 ou 1:02:30.";
+    else if (debut != null && fin != null && fin <= debut) erreur = "La fin doit suivre le début.";
+    else if (duree && debut != null && debut >= duree) erreur = "Le début dépasse la durée du média.";
+    return { debut, fin, erreur };
+  }, [avance.debut, avance.fin, infos, liste]);
+
+  const direct = infos?.type === "media" && infos.direct;
+  const desactive =
+    !site || envoi || chargement || direct || !!extrait.erreur || (liste && selection.size === 0) || enLigne === false;
+
+  async function telecharger() {
+    if (desactive) return;
+    setEnvoi(true);
+    setErreurEnvoi(null);
     try {
-      const res = await startDownload({ url, format, quality });
-      if (!res.ok || !res.job_id) throw new Error(res.error || "Erreur serveur");
-      setCurrentJobId(res.job_id);
-
-      pollingRef.current = setInterval(async () => {
-        try {
-          const j = await pollStatus(res.job_id);
-          setJob(j);
-          if (j.status === "done") {
-            clearInterval(pollingRef.current!);
-            saveHistory({
-              title: media?.title || url,
-              url,
-              site: j.site,
-              format,
-              quality,
-              ts: Date.now(),
-            });
-            showToast("✓ Fichier prêt !", "ok");
-          }
-          if (j.status === "error") {
-            clearInterval(pollingRef.current!);
-            showToast("⚠ " + (j.error || "Erreur"), "err");
-            setJob(null);
-          }
-        } catch {
-          clearInterval(pollingRef.current!);
-          showToast("⚠ Connexion perdue", "err");
-          setJob(null);
-        }
-      }, 1200);
-    } catch (e: any) {
-      showToast("⚠ " + e.message, "err");
-      setJob(null);
+      const tous = infos?.type === "liste" && selection.size === infos.entrees.length;
+      await ajouter({
+        url: infos?.url ?? saisie.trim(),
+        format,
+        qualite,
+        liste,
+        titre: infos?.titre || undefined,
+        debut: extrait.debut,
+        fin: extrait.fin,
+        sous_titres: estVideo(format) ? avance.sousTitres : [],
+        pochette: avance.pochette,
+        elements: liste && !tous ? Array.from(selection).sort((a, b) => a - b) : [],
+      });
+      // Le lien est vidé pour enchaîner : la tâche vit maintenant dans la file.
+      setSaisie("");
+      setModeListe(false);
+      setAvance((a) => ({ ...AVANCE_VIDE, pochette: a.pochette }));
+      champRef.current?.querySelector("input")?.focus();
+    } catch (e) {
+      setErreurEnvoi(e instanceof ErreurApi ? e.message : "Le téléchargement n'a pas pu être lancé.");
+    } finally {
+      setEnvoi(false);
     }
-  }, [url, format, quality, online, media, saveHistory, showToast]);
-
-  const handleDownloadFile = useCallback(() => {
-    if (!currentJobId) return;
-    const url = fileUrl(currentJobId);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = job?.filename || "media";
-    a.target = "_blank";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }, [currentJobId, job]);
-
-  const handleReset = useCallback(() => {
-    setJob(null);
-    setCurrentJobId(null);
-    if (pollingRef.current) clearInterval(pollingRef.current);
-  }, []);
-
-  const isDownloading = job && job.status !== "done" && job.status !== "error";
+  }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col">
-      <Header online={online} onRefreshPing={checkServer} />
-
-      <main className="flex-1 flex flex-col items-center px-4 py-10 sm:py-16">
-        {/* Hero */}
-        <div className="text-center mb-10 animate-fade-in">
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-3">
-            Téléchargez{" "}
-            <span className="text-red">n'importe quel média</span>
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-10 lg:gap-14">
+      <div className="min-w-0">
+        <header className="animate-rise mb-8">
+          <Etiquette className="mb-3">Téléchargeur</Etiquette>
+          <h1 className="text-3xl sm:text-[2.6rem] font-extrabold tracking-tight leading-[1.08]">
+            Collez un lien,
+            <br />
+            récupérez <span className="text-accent">le fichier</span>.
           </h1>
-          <p className="text-muted2 text-sm sm:text-base max-w-xl mx-auto">
-            YouTube, TikTok, Instagram, SoundCloud et 7+ sites — MP3, MP4, WAV en quelques secondes.
+          <p className="mt-4 text-muted2 text-[15px] max-w-xl leading-relaxed">
+            Audio jusqu&apos;à 320 kb/s ou sans perte, vidéo jusqu&apos;en 4K, playlists entières dans une seule archive.
           </p>
-        </div>
+        </header>
 
-        <SiteChips sites={SUPPORTED_SITES.map((s) => s.name)} />
+        <section className="animate-rise stagger-1 border border-border rounded-md bg-surface p-4 sm:p-5 space-y-5">
+          <div ref={champRef}>
+            <ChampLien valeur={saisie} onChange={changerSaisie} onValider={telecharger} />
+          </div>
 
-        <div className="w-full max-w-2xl space-y-4 animate-fade-in">
-          {online === false && <ServerBanner />}
-
-          {/* Media preview */}
-          {media && (
-            <MediaCard
-              title={media.title}
-              author={media.author}
-              thumbnail={media.thumbnail}
-              site={media.site}
-              siteColor={media.siteColor}
-              duration={media.duration}
-            />
+          {enLigne === false && (
+            <Alerte>
+              <span className="flex items-center gap-2 font-medium">
+                <WifiOff size={14} /> Serveur injoignable
+              </span>
+              <span className="text-muted2">
+                Il redémarre peut-être après une période d&apos;inactivité. Réessayez dans une minute.
+              </span>
+            </Alerte>
           )}
 
-          <DownloadForm
-            url={url}
+          {chargement && <ApercuChargement />}
+          {!chargement && erreurInfos && <Alerte>{erreurInfos}</Alerte>}
+          {!chargement && infos && (
+            <>
+              {infos.choix_liste && (
+                <ChoixListe modeListe={false} onChange={setModeListe} />
+              )}
+              {modeListe && infos.type === "liste" && <ChoixListe modeListe onChange={setModeListe} />}
+              <Apercu infos={infos} selection={selection} onSelection={setSelection} />
+            </>
+          )}
+
+          <Options
             format={format}
-            quality={quality}
-            onUrlChange={handleUrlChange}
-            onFormatChange={setFormat}
-            onQualityChange={setQuality}
-            onDownload={handleDownload}
-            loading={!!isDownloading}
-            disabled={!online}
+            qualite={qualite}
+            onFormat={changerFormat}
+            onQualite={setQualite}
+            hauteurs={infos?.type === "media" ? infos.hauteurs : []}
+            languesDispo={infos?.type === "media" ? infos.sous_titres : []}
+            liste={liste}
+            avance={avance}
+            onAvance={setAvance}
+            erreurExtrait={extrait.erreur}
           />
 
-          {isDownloading && (
-            <ProgressCard
-              status={job!.status}
-              progress={job!.progress}
-              site={job!.site}
-              format={format}
-            />
+          {erreurEnvoi && <Alerte>{erreurEnvoi}</Alerte>}
+
+          <button
+            onClick={telecharger}
+            disabled={desactive}
+            className={clsx(
+              "w-full h-12 rounded-md font-semibold text-[15px] flex items-center justify-center gap-2.5 transition-colors",
+              desactive ? "bg-s3 text-muted cursor-not-allowed" : "bg-accent text-white hover:brightness-110",
+            )}
+          >
+            {envoi ? <LoaderCircle size={17} className="animate-spin" /> : <ArrowDownToLine size={17} />}
+            {liste ? `Télécharger ${selection.size} élément${selection.size > 1 ? "s" : ""}` : "Télécharger"}
+          </button>
+        </section>
+
+        <p className="animate-rise stagger-2 mt-6 font-mono text-[11px] text-muted leading-relaxed">
+          {SITES.map((s) => s.nom).join(" · ")}
+        </p>
+      </div>
+
+      <aside className="animate-rise stagger-3 lg:sticky lg:top-24 lg:self-start">
+        <FileTaches />
+      </aside>
+    </div>
+  );
+}
+
+function ChoixListe({ modeListe, onChange }: { modeListe: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="animate-fade flex flex-col sm:flex-row sm:items-center gap-3 justify-between border border-border rounded-md px-4 py-3 bg-s2/50">
+      <p className="text-[13px] text-muted2">
+        {modeListe ? "Vous téléchargez la playlist entière." : "Ce lien fait partie d'une playlist."}
+      </p>
+      <div className="flex gap-1.5 shrink-0">
+        <button
+          onClick={() => onChange(false)}
+          className={clsx(
+            "h-8 px-3 rounded-md border text-[12px] flex items-center gap-1.5 transition-colors",
+            !modeListe ? "border-accent bg-accent/10 text-accent-texte" : "border-border text-muted2 hover:text-text",
           )}
-
-          {job?.status === "done" && (
-            <SuccessCard
-              filename={job.filename || "fichier prêt"}
-              onDownload={handleDownloadFile}
-              onReset={handleReset}
-            />
+        >
+          <MonitorPlay size={13} /> Cette vidéo
+        </button>
+        <button
+          onClick={() => onChange(true)}
+          className={clsx(
+            "h-8 px-3 rounded-md border text-[12px] flex items-center gap-1.5 transition-colors",
+            modeListe ? "border-accent bg-accent/10 text-accent-texte" : "border-border text-muted2 hover:text-text",
           )}
-
-          <HistoryList
-            items={history}
-            onClear={() => {
-              setHistory([]);
-              localStorage.removeItem("mediadl_history");
-              showToast("Historique effacé", "ok");
-            }}
-            onReuse={(u) => {
-              setUrl(u);
-              loadMedia(u);
-            }}
-          />
-        </div>
-      </main>
-
-      <Footer />
-      {toast && <Toast message={toast.msg} type={toast.type} />}
+        >
+          <ListMusic size={13} /> Toute la playlist
+        </button>
+      </div>
     </div>
   );
 }
